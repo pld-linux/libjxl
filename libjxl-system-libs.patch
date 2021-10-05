@@ -1,0 +1,78 @@
+--- libjxl-0.5/third_party/CMakeLists.txt.orig	2021-08-02 18:20:01.000000000 +0200
++++ libjxl-0.5/third_party/CMakeLists.txt	2021-10-03 20:02:33.247456659 +0200
+@@ -113,15 +113,6 @@ else()
+   endif()  # JPEGXL_DEP_LICENSE_DIR
+ endif()
+ 
+-# lodepng
+-if( NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lodepng/lodepng.h" )
+-  message(FATAL_ERROR "Please run ${PROJECT_SOURCE_DIR}/deps.sh to fetch the "
+-          "build dependencies.")
+-endif()
+-include(lodepng.cmake)
+-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/lodepng/LICENSE"
+-               ${PROJECT_BINARY_DIR}/LICENSE.lodepng COPYONLY)
+-
+ # brotli
+ if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/brotli/c/include/brotli/decode.h" OR
+     JPEGXL_FORCE_SYSTEM_BROTLI)
+@@ -191,33 +182,3 @@ else()
+   endif()  # BROTLI_EMSCRIPTEN
+ endif()
+ 
+-# *cms
+-if (JPEGXL_ENABLE_SKCMS)
+-  if( NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/skcms/skcms.h" )
+-    message(FATAL_ERROR "Please run ${PROJECT_SOURCE_DIR}/deps.sh to fetch the "
+-            "build dependencies.")
+-  endif()
+-  include(skcms.cmake)
+-  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/skcms/LICENSE"
+-                 ${PROJECT_BINARY_DIR}/LICENSE.skcms COPYONLY)
+-endif ()
+-if (JPEGXL_ENABLE_VIEWERS OR NOT JPEGXL_ENABLE_SKCMS)
+-  if( NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lcms/.git" )
+-    message(SEND_ERROR "Please run git submodule update --init")
+-  endif()
+-  include(lcms2.cmake)
+-  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/lcms/COPYING"
+-                 ${PROJECT_BINARY_DIR}/LICENSE.lcms COPYONLY)
+-endif()
+-
+-# sjpeg
+-if (JPEGXL_ENABLE_SJPEG)
+-  if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sjpeg/CMakeLists.txt")
+-    message(FATAL_ERROR "Please run ${PROJECT_SOURCE_DIR}/deps.sh to fetch the "
+-            "build dependencies.")
+-  endif()
+-  include(sjpeg.cmake)
+-  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/sjpeg/COPYING"
+-                 ${PROJECT_BINARY_DIR}/LICENSE.sjpeg COPYONLY)
+-endif ()
+-
+--- libjxl-0.5/lib/jxl.cmake.orig	2021-08-02 18:20:01.000000000 +0200
++++ libjxl-0.5/lib/jxl.cmake	2021-10-03 20:50:42.295138680 +0200
+@@ -381,23 +381,6 @@ if (JPEGXL_ENABLE_PROFILER)
+ target_link_libraries(jxl_enc-obj PUBLIC jxl_profiler)
+ endif()
+ 
+-#TODO(lode): don't depend on CMS for the core library
+-if (JPEGXL_ENABLE_SKCMS)
+-  target_include_directories(jxl_enc-obj PRIVATE
+-    $<TARGET_PROPERTY:skcms,INCLUDE_DIRECTORIES>
+-  )
+-  target_include_directories(jxl_dec-obj PRIVATE
+-    $<TARGET_PROPERTY:skcms,INCLUDE_DIRECTORIES>
+-  )
+-else ()
+-  target_include_directories(jxl_enc-obj PRIVATE
+-    $<TARGET_PROPERTY:lcms2,INCLUDE_DIRECTORIES>
+-  )
+-  target_include_directories(jxl_dec-obj PRIVATE
+-    $<TARGET_PROPERTY:lcms2,INCLUDE_DIRECTORIES>
+-  )
+-endif ()
+-
+ # Headers for exporting/importing public headers
+ include(GenerateExportHeader)
+ # TODO(deymo): Add these visibility properties to the static dependencies of
