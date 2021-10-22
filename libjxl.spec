@@ -2,7 +2,7 @@ Summary:	JPEG XL reference implementation
 Summary(pl.UTF-8):	Referencyjna implementacja JPEG XL
 Name:		libjxl
 Version:	0.5
-Release:	1
+Release:	2
 License:	BSD
 Group:		Libraries
 #Source0Download: https://github.com/libjxl/libjxl/releases
@@ -194,4 +194,5 @@ fi
 
 %files -n gimp-plugin-jxl
 %defattr(644,root,root,755)
+%dir %{_libdir}/gimp/2.0/plug-ins/file-jxl
 %attr(755,root,root) %{_libdir}/gimp/2.0/plug-ins/file-jxl/file-jxl
