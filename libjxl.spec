@@ -27,6 +27,7 @@ BuildRequires:	libjpeg-devel
 BuildRequires:	libpng-devel
 BuildRequires:	libwebp-devel
 BuildRequires:	libstdc++-devel >= 6:7
+BuildRequires:	lodepng-devel
 BuildRequires:	pkgconfig
 BuildRequires:	python3-devel >= 1:3
 BuildRequires:	rpmbuild(macros) >= 1.605
