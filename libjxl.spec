@@ -1,14 +1,15 @@
 Summary:	JPEG XL reference implementation
 Summary(pl.UTF-8):	Referencyjna implementacja JPEG XL
 Name:		libjxl
-Version:	0.5
-Release:	6
+Version:	0.6.1
+Release:	1
 License:	BSD
 Group:		Libraries
 #Source0Download: https://github.com/libjxl/libjxl/releases
 Source0:	https://github.com/libjxl/libjxl/archive/v%{version}/%{name}-%{version}.tar.gz
-# Source0-md5:	692b38d4af06f0590304e9626b5fb881
+# Source0-md5:	5dae0f40ad6180c1b168bbf7edaf8e7d
 Patch0:		%{name}-system-libs.patch
+Patch1:		%{name}-hwy.patch
 URL:		https://github.com/libjxl/libjxl
 BuildRequires:	OpenEXR-devel
 BuildRequires:	asciidoc
@@ -20,8 +21,8 @@ BuildRequires:	gimp-devel >= 1:2.10
 BuildRequires:	gmock-devel
 BuildRequires:	google-benchmark-devel
 BuildRequires:	gtest-devel
-BuildRequires:	highway-devel
-BuildRequires:	lcms2-devel >= 2
+BuildRequires:	highway-devel >= 0.15.0
+BuildRequires:	lcms2-devel >= 2.10
 BuildRequires:	libavif-devel
 BuildRequires:	libbrotli-devel
 BuildRequires:	libjpeg-devel
@@ -32,6 +33,8 @@ BuildRequires:	lodepng-devel
 BuildRequires:	pkgconfig
 BuildRequires:	python3-devel >= 1:3
 BuildRequires:	rpmbuild(macros) >= 1.605
+# for gdk-pixbuf loader only (the rest uses lcms2 by default)
+BuildRequires:	skcms-devel
 BuildRequires:	zlib-devel
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
@@ -65,8 +68,8 @@ Summary:	Header files for JXL libraries
 Summary(pl.UTF-8):	Pliki nagłówkowe bibliotek JXL
 Group:		Development/Libraries
 Requires:	%{name} = %{version}-%{release}
-Requires:	highway-devel
-Requires:	lcms2-devel >= 2
+Requires:	highway-devel >= 0.15.0
+Requires:	lcms2-devel >= 2.10
 Requires:	libbrotli-devel
 Requires:	libstdc++-devel >= 6:7
 
@@ -118,11 +121,13 @@ Wtyczka wczytująca/zapisująca pliki JPEG XL dla GIMP-a.
 %prep
 %setup -q
 %patch0 -p1
+%patch1 -p1
 
 %build
 install -d build
 cd build
 %cmake .. \
+	-DBUILD_TESTING=OFF \
 	-DJPEGXL_ENABLE_PLUGINS=ON \
 	-DJPEGXL_ENABLE_SJPEG=OFF \
 	-DJPEGXL_ENABLE_SKCMS=OFF \
@@ -162,9 +167,9 @@ fi
 %defattr(644,root,root,755)
 %doc AUTHORS CHANGELOG.md CONTRIBUTORS LICENSE PATENTS README.md SECURITY.md doc/xl_overview.md
 %attr(755,root,root) %{_libdir}/libjxl.so.*.*.*
-%attr(755,root,root) %ghost %{_libdir}/libjxl.so.0
+%attr(755,root,root) %ghost %{_libdir}/libjxl.so.0.6
 %attr(755,root,root) %{_libdir}/libjxl_threads.so.*.*.*
-%attr(755,root,root) %ghost %{_libdir}/libjxl_threads.so.0
+%attr(755,root,root) %ghost %{_libdir}/libjxl_threads.so.0.6
 
 %files tools
 %defattr(644,root,root,755)

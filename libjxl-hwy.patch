@@ -1,0 +1,598 @@
+commit e0107a6ca637eb3997131e966e19fcd6001b37ad
+Author: Jan Wassenberg <janwas@google.com>
+Date:   Fri Nov 12 09:12:35 2021 +0100
+
+    Avoid deprecated Highway functions
+    
+    Instead use the newer overloads with the extra d arg required to
+    support SVE/RISC-V.
+
+diff --git a/lib/jxl/dec_reconstruct.cc b/lib/jxl/dec_reconstruct.cc
+index 9d1eb61..69a4361 100644
+--- a/lib/jxl/dec_reconstruct.cc
++++ b/lib/jxl/dec_reconstruct.cc
+@@ -357,8 +357,8 @@ void DoYCbCrUpsampling(size_t hs, size_t vs, ImageF* plane_in, const Rect& rect,
+         Store(left, d, out + x);
+         Store(right, d, out + x + 1);
+ #else
+-        Store(InterleaveLower(left, right), d, out + x);
+-        Store(InterleaveUpper(left, right), d, out + x + Lanes(d));
++        Store(InterleaveLower(d, left, right), d, out + x);
++        Store(InterleaveUpper(d, left, right), d, out + x + Lanes(d));
+ #endif
+       }
+     }
+diff --git a/lib/jxl/dec_upsample.cc b/lib/jxl/dec_upsample.cc
+index 7277e4f..3cb3f36 100644
+--- a/lib/jxl/dec_upsample.cc
++++ b/lib/jxl/dec_upsample.cc
+@@ -176,8 +176,8 @@ void Upsample(const ImageF& src, const Rect& src_rect, ImageF* dst,
+         min = Min(LoadU(df, raw_min_row + sx + fx), min);
+         max = Max(LoadU(df, raw_max_row + sx + fx), max);
+       }
+-      min = MinOfLanes(min);
+-      max = MaxOfLanes(max);
++      min = MinOfLanes(df, min);
++      max = MaxOfLanes(df, max);
+       for (size_t lx = 0; lx < N; lx += V) {
+         StoreU(min, df, min_row + N * sx + lx);
+         StoreU(max, df, max_row + N * sx + lx);
+diff --git a/lib/jxl/enc_ac_strategy.cc b/lib/jxl/enc_ac_strategy.cc
+index bc50465..c0ed68f 100644
+--- a/lib/jxl/enc_ac_strategy.cc
++++ b/lib/jxl/enc_ac_strategy.cc
+@@ -429,8 +429,8 @@ float EstimateEntropy(const AcStrategy& acs, size_t x, size_t y,
+     }
+     entropy_v += nzeros_v * cost1;
+ 
+-    entropy += GetLane(SumOfLanes(entropy_v));
+-    size_t num_nzeros = GetLane(SumOfLanes(nzeros_v));
++    entropy += GetLane(SumOfLanes(df, entropy_v));
++    size_t num_nzeros = GetLane(SumOfLanes(df, nzeros_v));
+     // Add #bit of num_nonzeros, as an estimate of the cost for encoding the
+     // number of non-zeros of the block.
+     size_t nbits = CeilLog2Nonzero(num_nzeros + 1) + 1;
+@@ -441,9 +441,9 @@ float EstimateEntropy(const AcStrategy& acs, size_t x, size_t y,
+   float ret =
+       entropy +
+       masking *
+-          ((config.info_loss_multiplier * GetLane(SumOfLanes(info_loss))) +
++          ((config.info_loss_multiplier * GetLane(SumOfLanes(df, info_loss))) +
+            (config.info_loss_multiplier2 *
+-            sqrt(num_blocks * GetLane(SumOfLanes(info_loss2)))));
++            sqrt(num_blocks * GetLane(SumOfLanes(df, info_loss2)))));
+   return ret;
+ }
+ 
+diff --git a/lib/jxl/enc_adaptive_quantization.cc b/lib/jxl/enc_adaptive_quantization.cc
+index 7a6c772..51cea65 100644
+--- a/lib/jxl/enc_adaptive_quantization.cc
++++ b/lib/jxl/enc_adaptive_quantization.cc
+@@ -189,7 +189,7 @@ V GammaModulation(const D d, const size_t x, const size_t y,
+       overall_ratio += avg_ratio;
+     }
+   }
+-  overall_ratio = SumOfLanes(overall_ratio);
++  overall_ratio = SumOfLanes(d, overall_ratio);
+   overall_ratio *= Set(d, 1.0f / 64);
+   // ideally -1.0, but likely optimal correction adds some entropy, so slightly
+   // less than that.
+@@ -246,12 +246,12 @@ V ColorModulation(const D d, const size_t x, const size_t y,
+   // blue we consider as if it was fully red or blue.
+   static const float ratio = 30.610615782142737f;  // out of 64 pixels.
+ 
+-  auto overall_red_coverage = SumOfLanes(red_coverage);
++  auto overall_red_coverage = SumOfLanes(d, red_coverage);
+   overall_red_coverage =
+       Min(overall_red_coverage, Set(d, ratio * kRedRampLength));
+   overall_red_coverage *= Set(d, red_strength / ratio);
+ 
+-  auto overall_blue_coverage = SumOfLanes(blue_coverage);
++  auto overall_blue_coverage = SumOfLanes(d, blue_coverage);
+   overall_blue_coverage =
+       Min(overall_blue_coverage, Set(d, ratio * kBlueRampLength));
+   overall_blue_coverage *= Set(d, blue_strength / ratio);
+@@ -295,7 +295,7 @@ V HfModulation(const D d, const size_t x, const size_t y, const ImageF& xyb,
+     }
+   }
+ 
+-  sum = SumOfLanes(sum);
++  sum = SumOfLanes(d, sum);
+   return MulAdd(sum, Set(d, -2.0052193233688884f / 112), out_val);
+ }
+ 
+diff --git a/lib/jxl/enc_ar_control_field.cc b/lib/jxl/enc_ar_control_field.cc
+index f43340e..f8025ac 100644
+--- a/lib/jxl/enc_ar_control_field.cc
++++ b/lib/jxl/enc_ar_control_field.cc
+@@ -157,7 +157,7 @@ void ProcessTile(const Image3F& opsin, PassesEncoderState* enc_state,
+           sum += LoadU(df4, rows_in[iy] + x * 4 + ix + 2);
+         }
+       }
+-      row_out[x] = GetLane(Sqrt(SumOfLanes(sum))) * (1.0f / 4.0f);
++      row_out[x] = GetLane(Sqrt(SumOfLanes(df4, sum))) * (1.0f / 4.0f);
+     }
+   }
+   // Indexing iy and ix is a bit tricky as we include a 2 pixel border
+@@ -193,7 +193,7 @@ void ProcessTile(const Image3F& opsin, PassesEncoderState* enc_state,
+             sum += Load(df4, rows_in[iy] + sx + ix);
+           }
+         }
+-        row_out[x] = GetLane(Sqrt(SumOfLanes(sum))) * (1.0f / 4.0f);
++        row_out[x] = GetLane(Sqrt(SumOfLanes(df4, sum))) * (1.0f / 4.0f);
+       } else {
+         float sum = 0;
+         for (size_t iy = sy; iy < ey; iy++) {
+diff --git a/lib/jxl/enc_butteraugli_pnorm.cc b/lib/jxl/enc_butteraugli_pnorm.cc
+index 32623b8..b7feac0 100644
+--- a/lib/jxl/enc_butteraugli_pnorm.cc
++++ b/lib/jxl/enc_butteraugli_pnorm.cc
+@@ -87,13 +87,13 @@ double ComputeDistanceP(const ImageF& distmap, const ButteraugliParams& params,
+     }
+     double v = 0;
+     v += pow(
+-        onePerPixels * (sum1[0] + GetLane(SumOfLanes(Load(d, sum_totals0)))),
++        onePerPixels * (sum1[0] + GetLane(SumOfLanes(d, Load(d, sum_totals0)))),
+         1.0 / (p * 1.0));
+     v += pow(
+-        onePerPixels * (sum1[1] + GetLane(SumOfLanes(Load(d, sum_totals1)))),
++        onePerPixels * (sum1[1] + GetLane(SumOfLanes(d, Load(d, sum_totals1)))),
+         1.0 / (p * 2.0));
+     v += pow(
+-        onePerPixels * (sum1[2] + GetLane(SumOfLanes(Load(d, sum_totals2)))),
++        onePerPixels * (sum1[2] + GetLane(SumOfLanes(d, Load(d, sum_totals2)))),
+         1.0 / (p * 4.0));
+     v /= 3.0;
+     return v;
+diff --git a/lib/jxl/enc_chroma_from_luma.cc b/lib/jxl/enc_chroma_from_luma.cc
+index e5c3f38..370595c 100644
+--- a/lib/jxl/enc_chroma_from_luma.cc
++++ b/lib/jxl/enc_chroma_from_luma.cc
+@@ -91,9 +91,9 @@ struct CFLFunction {
+       fdme_v += IfThenElse(av >= thres, zero, dme);
+     }
+ 
+-    *fpeps = first_derivative_peps + GetLane(SumOfLanes(fdpe_v));
+-    *fmeps = first_derivative_meps + GetLane(SumOfLanes(fdme_v));
+-    return first_derivative + GetLane(SumOfLanes(fd_v));
++    *fpeps = first_derivative_peps + GetLane(SumOfLanes(df, fdpe_v));
++    *fmeps = first_derivative_meps + GetLane(SumOfLanes(df, fdme_v));
++    return first_derivative + GetLane(SumOfLanes(df, fd_v));
+   }
+ 
+   const float* JXL_RESTRICT values_m;
+@@ -124,8 +124,8 @@ int32_t FindBestMultiplier(const float* values_m, const float* values_s,
+       cb = MulAdd(a, b, cb);
+     }
+     // + distance_mul * x^2 * num
+-    x = -GetLane(SumOfLanes(cb)) /
+-        (GetLane(SumOfLanes(ca)) + num * distance_mul * 0.5f);
++    x = -GetLane(SumOfLanes(df, cb)) /
++        (GetLane(SumOfLanes(df, ca)) + num * distance_mul * 0.5f);
+   } else {
+     constexpr float eps = 1;
+     constexpr float kClamp = 20.0f;
+diff --git a/lib/jxl/enc_cluster.cc b/lib/jxl/enc_cluster.cc
+index 1f12a29..8ae863c 100644
+--- a/lib/jxl/enc_cluster.cc
++++ b/lib/jxl/enc_cluster.cc
+@@ -49,7 +49,7 @@ void HistogramEntropy(const Histogram& a) {
+     const auto counts = LoadU(di, &a.data_[i]);
+     entropy_lanes += Entropy(ConvertTo(df, counts), inv_tot, total);
+   }
+-  a.entropy_ += GetLane(SumOfLanes(entropy_lanes));
++  a.entropy_ += GetLane(SumOfLanes(df, entropy_lanes));
+ }
+ 
+ float HistogramDistance(const Histogram& a, const Histogram& b) {
+@@ -71,7 +71,7 @@ float HistogramDistance(const Histogram& a, const Histogram& b) {
+     const auto counts = ConvertTo(df, a_counts + b_counts);
+     distance_lanes += Entropy(counts, inv_tot, total);
+   }
+-  const float total_distance = GetLane(SumOfLanes(distance_lanes));
++  const float total_distance = GetLane(SumOfLanes(df, distance_lanes));
+   return total_distance - a.entropy_ - b.entropy_;
+ }
+ 
+diff --git a/lib/jxl/enc_entropy_coder.cc b/lib/jxl/enc_entropy_coder.cc
+index 0946300..07fe5a0 100644
+--- a/lib/jxl/enc_entropy_coder.cc
++++ b/lib/jxl/enc_entropy_coder.cc
+@@ -86,7 +86,7 @@ int32_t NumNonZeroExceptLLF(const size_t cx, const size_t cy,
+ 
+   // We want area - sum_zero, add because neg_sum_zero is already negated.
+   const int32_t nzeros =
+-      int32_t(cx * cy * kDCTBlockSize) + GetLane(SumOfLanes(neg_sum_zero));
++      int32_t(cx * cy * kDCTBlockSize) + GetLane(SumOfLanes(di, neg_sum_zero));
+ 
+   const int32_t shifted_nzeros = static_cast<int32_t>(
+       (nzeros + covered_blocks - 1) >> log2_covered_blocks);
+@@ -135,7 +135,7 @@ int32_t NumNonZero8x8ExceptDC(const int32_t* JXL_RESTRICT block,
+ 
+   // We want 64 - sum_zero, add because neg_sum_zero is already negated.
+   const int32_t nzeros =
+-      int32_t(kDCTBlockSize) + GetLane(SumOfLanes(neg_sum_zero));
++      int32_t(kDCTBlockSize) + GetLane(SumOfLanes(di, neg_sum_zero));
+ 
+   *nzeros_pos = nzeros;
+ 
+diff --git a/lib/jxl/enc_fast_heuristics.cc b/lib/jxl/enc_fast_heuristics.cc
+index 16f7670..0551782 100644
+--- a/lib/jxl/enc_fast_heuristics.cc
++++ b/lib/jxl/enc_fast_heuristics.cc
+@@ -94,8 +94,8 @@ Status Heuristics(PassesEncoderState* enc_state,
+               cb = MulAdd(a, b, cb);
+             }
+           }
+-          float best =
+-              -GetLane(SumOfLanes(cb)) / (GetLane(SumOfLanes(ca)) + 1e-9f);
++          float best = -GetLane(SumOfLanes(df, cb)) /
++                       (GetLane(SumOfLanes(df, ca)) + 1e-9f);
+           int8_t& res = (c == 0 ? shared.cmap.ytox_map : shared.cmap.ytob_map)
+                             .Row(ty)[tx];
+           res = std::max(-128.0f, std::min(127.0f, roundf(best)));
+@@ -124,8 +124,8 @@ Status Heuristics(PassesEncoderState* enc_state,
+                 max = IfThenElse(max > nn, max, nn);
+               }
+             }
+-            row_out_avg[x] = GetLane(SumOfLanes(sum));
+-            row_out[x] = GetLane(MaxOfLanes(max));
++            row_out_avg[x] = GetLane(SumOfLanes(df4, sum));
++            row_out[x] = GetLane(MaxOfLanes(df4, max));
+           }
+         }
+       },
+diff --git a/lib/jxl/gauss_blur.cc b/lib/jxl/gauss_blur.cc
+index f9babe7..f24a74c 100644
+--- a/lib/jxl/gauss_blur.cc
++++ b/lib/jxl/gauss_blur.cc
+@@ -421,7 +421,7 @@ ImageF ConvolveXSampleAndTranspose(const ImageF& in,
+       for (int i = -r; i <= r; i += Lanes(df)) {
+         sum = MulAdd(LoadU(df, rowp + x + i), LoadU(df, kernelp + i), sum);
+       }
+-      out.Row(ox)[y] = GetLane(SumOfLanes(sum));
++      out.Row(ox)[y] = GetLane(SumOfLanes(df, sum));
+     }
+     for (; x < in.xsize(); x += res, ++ox) {
+       float sum = 0.0f;
+diff --git a/lib/jxl/modular/encoding/enc_ma.cc b/lib/jxl/modular/encoding/enc_ma.cc
+index f847db6..7700ecc 100644
+--- a/lib/jxl/modular/encoding/enc_ma.cc
++++ b/lib/jxl/modular/encoding/enc_ma.cc
+@@ -60,7 +60,7 @@ float EstimateBits(const int32_t *counts, int32_t *rounded_counts,
+     bits_lanes -=
+         IfThenElse(counts_v == zero, zero, counts_v * BitCast(df, nbps));
+   }
+-  return GetLane(SumOfLanes(bits_lanes));
++  return GetLane(SumOfLanes(df, bits_lanes));
+ }
+ 
+ void MakeSplitNode(size_t pos, int property, int splitval, Predictor lpred,
+diff --git a/lib/jxl/rational_polynomial_test.cc b/lib/jxl/rational_polynomial_test.cc
+index d0e628d..e0d5a6e 100644
+--- a/lib/jxl/rational_polynomial_test.cc
++++ b/lib/jxl/rational_polynomial_test.cc
+@@ -50,7 +50,7 @@ struct EvalLog2 {
+     const HWY_FULL(int32_t) di;
+     const auto x_bits = BitCast(di, vx);
+     // Cannot handle negative numbers / NaN.
+-    JXL_DASSERT(AllTrue(Abs(x_bits) == x_bits));
++    JXL_DASSERT(AllTrue(di, Abs(x_bits) == x_bits));
+ 
+     // Range reduction to [-1/3, 1/3] - 3 integer, 2 float ops
+     const auto exp_bits = x_bits - Set(di, 0x3f2aaaab);  // = 2/3
+diff --git a/lib/jxl/splines.cc b/lib/jxl/splines.cc
+index 58ebfd6..0026fa9 100644
+--- a/lib/jxl/splines.cc
++++ b/lib/jxl/splines.cc
+@@ -53,7 +53,7 @@ float ContinuousIDCT(const float dct[32], float t) {
+     auto local_res = LoadU(df, dct + i) * cos;
+     result = MulAdd(Set(df, square_root<2>::value), local_res, result);
+   }
+-  return GetLane(SumOfLanes(result));
++  return GetLane(SumOfLanes(df, result));
+ }
+ 
+ template <typename DF>
+diff --git a/lib/jxl/transpose-inl.h b/lib/jxl/transpose-inl.h
+index d12b129..e89e8af 100644
+--- a/lib/jxl/transpose-inl.h
++++ b/lib/jxl/transpose-inl.h
+@@ -137,25 +137,26 @@ JXL_INLINE_TRANSPOSE void GenericTransposeBlock(TransposeSimdTag<true>,
+   static_assert(COLS_or_0 % 4 == 0, "Invalid number of columns");
+   for (size_t n = 0; n < ROWS; n += 4) {
+     for (size_t m = 0; m < COLS; m += 4) {
+-      const auto p0 = from.LoadPart(BlockDesc<4>(), n + 0, m + 0);
+-      const auto p1 = from.LoadPart(BlockDesc<4>(), n + 1, m + 0);
+-      const auto p2 = from.LoadPart(BlockDesc<4>(), n + 2, m + 0);
+-      const auto p3 = from.LoadPart(BlockDesc<4>(), n + 3, m + 0);
+-
+-      const auto q0 = InterleaveLower(p0, p2);
+-      const auto q1 = InterleaveLower(p1, p3);
+-      const auto q2 = InterleaveUpper(p0, p2);
+-      const auto q3 = InterleaveUpper(p1, p3);
+-
+-      const auto r0 = InterleaveLower(q0, q1);
+-      const auto r1 = InterleaveUpper(q0, q1);
+-      const auto r2 = InterleaveLower(q2, q3);
+-      const auto r3 = InterleaveUpper(q2, q3);
+-
+-      to.StorePart(BlockDesc<4>(), r0, m + 0, n + 0);
+-      to.StorePart(BlockDesc<4>(), r1, m + 1, n + 0);
+-      to.StorePart(BlockDesc<4>(), r2, m + 2, n + 0);
+-      to.StorePart(BlockDesc<4>(), r3, m + 3, n + 0);
++      const BlockDesc<4> d;
++      const auto p0 = from.LoadPart(d, n + 0, m + 0);
++      const auto p1 = from.LoadPart(d, n + 1, m + 0);
++      const auto p2 = from.LoadPart(d, n + 2, m + 0);
++      const auto p3 = from.LoadPart(d, n + 3, m + 0);
++
++      const auto q0 = InterleaveLower(d, p0, p2);
++      const auto q1 = InterleaveLower(d, p1, p3);
++      const auto q2 = InterleaveUpper(d, p0, p2);
++      const auto q3 = InterleaveUpper(d, p1, p3);
++
++      const auto r0 = InterleaveLower(d, q0, q1);
++      const auto r1 = InterleaveUpper(d, q0, q1);
++      const auto r2 = InterleaveLower(d, q2, q3);
++      const auto r3 = InterleaveUpper(d, q2, q3);
++
++      to.StorePart(d, r0, m + 0, n + 0);
++      to.StorePart(d, r1, m + 1, n + 0);
++      to.StorePart(d, r2, m + 2, n + 0);
++      to.StorePart(d, r3, m + 3, n + 0);
+     }
+   }
+ }
+From 0902f85ca6e9e305338baf7974192acab8c53ac5 Mon Sep 17 00:00:00 2001
+From: Jan Wassenberg <janwas@google.com>
+Date: Thu, 6 Jan 2022 09:36:20 +0100
+Subject: [PATCH] Avoid deprecated Hwy functions - add d arg. Also remove
+ unnecessary include
+
+---
+ .../test_render_pipeline_stages.h             |  1 -
+ lib/jxl/transpose-inl.h                       | 85 ++++++++++---------
+ 2 files changed, 43 insertions(+), 43 deletions(-)
+
+#diff --git a/lib/jxl/render_pipeline/test_render_pipeline_stages.h b/lib/jxl/render_pipeline/test_render_pipeline_stages.h
+#index 6b33b677a..fc6b38a83 100644
+#--- a/lib/jxl/render_pipeline/test_render_pipeline_stages.h
+#+++ b/lib/jxl/render_pipeline/test_render_pipeline_stages.h
+#@@ -11,7 +11,6 @@
+# #include <utility>
+# #include <vector>
+# 
+#-#include "gtest/gtest.h"
+# #include "lib/jxl/render_pipeline/render_pipeline_stage.h"
+# 
+# namespace jxl {
+diff --git a/lib/jxl/transpose-inl.h b/lib/jxl/transpose-inl.h
+index e89e8af0a..467442073 100644
+--- a/lib/jxl/transpose-inl.h
++++ b/lib/jxl/transpose-inl.h
+@@ -74,50 +74,51 @@ JXL_INLINE_TRANSPOSE void GenericTransposeBlock(TransposeSimdTag<true>,
+   static_assert(COLS_or_0 % 8 == 0, "Invalid number of columns");
+   for (size_t n = 0; n < ROWS; n += 8) {
+     for (size_t m = 0; m < COLS; m += 8) {
+-      auto i0 = from.LoadPart(BlockDesc<8>(), n + 0, m + 0);
+-      auto i1 = from.LoadPart(BlockDesc<8>(), n + 1, m + 0);
+-      auto i2 = from.LoadPart(BlockDesc<8>(), n + 2, m + 0);
+-      auto i3 = from.LoadPart(BlockDesc<8>(), n + 3, m + 0);
+-      auto i4 = from.LoadPart(BlockDesc<8>(), n + 4, m + 0);
+-      auto i5 = from.LoadPart(BlockDesc<8>(), n + 5, m + 0);
+-      auto i6 = from.LoadPart(BlockDesc<8>(), n + 6, m + 0);
+-      auto i7 = from.LoadPart(BlockDesc<8>(), n + 7, m + 0);
++      const BlockDesc<8> d;
++      auto i0 = from.LoadPart(d, n + 0, m + 0);
++      auto i1 = from.LoadPart(d, n + 1, m + 0);
++      auto i2 = from.LoadPart(d, n + 2, m + 0);
++      auto i3 = from.LoadPart(d, n + 3, m + 0);
++      auto i4 = from.LoadPart(d, n + 4, m + 0);
++      auto i5 = from.LoadPart(d, n + 5, m + 0);
++      auto i6 = from.LoadPart(d, n + 6, m + 0);
++      auto i7 = from.LoadPart(d, n + 7, m + 0);
+       // Surprisingly, this straightforward implementation (24 cycles on port5)
+       // is faster than load128+insert and LoadDup128+ConcatUpperLower+blend.
+-      const auto q0 = InterleaveLower(i0, i2);
+-      const auto q1 = InterleaveLower(i1, i3);
+-      const auto q2 = InterleaveUpper(i0, i2);
+-      const auto q3 = InterleaveUpper(i1, i3);
+-      const auto q4 = InterleaveLower(i4, i6);
+-      const auto q5 = InterleaveLower(i5, i7);
+-      const auto q6 = InterleaveUpper(i4, i6);
+-      const auto q7 = InterleaveUpper(i5, i7);
+-
+-      const auto r0 = InterleaveLower(q0, q1);
+-      const auto r1 = InterleaveUpper(q0, q1);
+-      const auto r2 = InterleaveLower(q2, q3);
+-      const auto r3 = InterleaveUpper(q2, q3);
+-      const auto r4 = InterleaveLower(q4, q5);
+-      const auto r5 = InterleaveUpper(q4, q5);
+-      const auto r6 = InterleaveLower(q6, q7);
+-      const auto r7 = InterleaveUpper(q6, q7);
+-
+-      i0 = ConcatLowerLower(r4, r0);
+-      i1 = ConcatLowerLower(r5, r1);
+-      i2 = ConcatLowerLower(r6, r2);
+-      i3 = ConcatLowerLower(r7, r3);
+-      i4 = ConcatUpperUpper(r4, r0);
+-      i5 = ConcatUpperUpper(r5, r1);
+-      i6 = ConcatUpperUpper(r6, r2);
+-      i7 = ConcatUpperUpper(r7, r3);
+-      to.StorePart(BlockDesc<8>(), i0, m + 0, n + 0);
+-      to.StorePart(BlockDesc<8>(), i1, m + 1, n + 0);
+-      to.StorePart(BlockDesc<8>(), i2, m + 2, n + 0);
+-      to.StorePart(BlockDesc<8>(), i3, m + 3, n + 0);
+-      to.StorePart(BlockDesc<8>(), i4, m + 4, n + 0);
+-      to.StorePart(BlockDesc<8>(), i5, m + 5, n + 0);
+-      to.StorePart(BlockDesc<8>(), i6, m + 6, n + 0);
+-      to.StorePart(BlockDesc<8>(), i7, m + 7, n + 0);
++      const auto q0 = InterleaveLower(d, i0, i2);
++      const auto q1 = InterleaveLower(d, i1, i3);
++      const auto q2 = InterleaveUpper(d, i0, i2);
++      const auto q3 = InterleaveUpper(d, i1, i3);
++      const auto q4 = InterleaveLower(d, i4, i6);
++      const auto q5 = InterleaveLower(d, i5, i7);
++      const auto q6 = InterleaveUpper(d, i4, i6);
++      const auto q7 = InterleaveUpper(d, i5, i7);
++
++      const auto r0 = InterleaveLower(d, q0, q1);
++      const auto r1 = InterleaveUpper(d, q0, q1);
++      const auto r2 = InterleaveLower(d, q2, q3);
++      const auto r3 = InterleaveUpper(d, q2, q3);
++      const auto r4 = InterleaveLower(d, q4, q5);
++      const auto r5 = InterleaveUpper(d, q4, q5);
++      const auto r6 = InterleaveLower(d, q6, q7);
++      const auto r7 = InterleaveUpper(d, q6, q7);
++
++      i0 = ConcatLowerLower(d, r4, r0);
++      i1 = ConcatLowerLower(d, r5, r1);
++      i2 = ConcatLowerLower(d, r6, r2);
++      i3 = ConcatLowerLower(d, r7, r3);
++      i4 = ConcatUpperUpper(d, r4, r0);
++      i5 = ConcatUpperUpper(d, r5, r1);
++      i6 = ConcatUpperUpper(d, r6, r2);
++      i7 = ConcatUpperUpper(d, r7, r3);
++      to.StorePart(d, i0, m + 0, n + 0);
++      to.StorePart(d, i1, m + 1, n + 0);
++      to.StorePart(d, i2, m + 2, n + 0);
++      to.StorePart(d, i3, m + 3, n + 0);
++      to.StorePart(d, i4, m + 4, n + 0);
++      to.StorePart(d, i5, m + 5, n + 0);
++      to.StorePart(d, i6, m + 6, n + 0);
++      to.StorePart(d, i7, m + 7, n + 0);
+     }
+   }
+ }
+From cacad76ac565a9e008409207de5b2197f5128f1f Mon Sep 17 00:00:00 2001
+From: Evgenii Kliuchnikov <eustas@google.com>
+Date: Tue, 1 Feb 2022 15:09:13 +0000
+Subject: [PATCH] Ramp-up EMCC and V8 versions for CI
+
+Drive-by: ramp-up HWY version to 0.16.0rc
+---
+ .github/workflows/build_test.yml | 6 +++---
+ deps.sh                          | 2 +-
+ lib/jxl/quant_weights.cc         | 4 ++--
+ third_party/CMakeLists.txt       | 1 +
+ third_party/highway              | 2 +-
+ 5 files changed, 8 insertions(+), 7 deletions(-)
+
+#diff --git a/.github/workflows/build_test.yml b/.github/workflows/build_test.yml
+#index 7c1e9fd72..2c99b0ab7 100644
+#--- a/.github/workflows/build_test.yml
+#+++ b/.github/workflows/build_test.yml
+#@@ -461,8 +461,8 @@ jobs:
+#     runs-on: ubuntu-latest
+#     env:
+#       CCACHE_DIR: ${{ github.workspace }}/.ccache
+#-      EM_VERSION: 2.0.23
+#-      V8_VERSION: 9.3.22
+#+      EM_VERSION: 3.1.4
+#+      V8_VERSION: 9.8.177
+#       V8: ${{ github.workspace }}/.jsvu/v8
+#       BUILD_TARGET: wasm32
+# 
+#@@ -506,7 +506,7 @@ jobs:
+#           ${{ runner.os }}-${{ steps.git-env.outputs.parent }}-${{ matrix.variant }}
+# 
+#     - name: Install emsdk
+#-      uses: mymindstorm/setup-emsdk@v10
+#+      uses: mymindstorm/setup-emsdk@v11
+#       # TODO(deymo): We could cache this action but it doesn't work when running
+#       # in a matrix.
+#       with:
+#diff --git a/deps.sh b/deps.sh
+#index 1abf18742..e2bbd755a 100755
+#--- a/deps.sh
+#+++ b/deps.sh
+#@@ -14,7 +14,7 @@ MYDIR=$(dirname $(realpath "$0"))
+# # Git revisions we use for the given submodules. Update these whenever you
+# # update a git submodule.
+# THIRD_PARTY_GFLAGS="827c769e5fc98e0f2a34c47cef953cc6328abced"
+#-THIRD_PARTY_HIGHWAY="e69083a12a05caf037cabecdf1b248b7579705a5"
+#+THIRD_PARTY_HIGHWAY="f13e3b956eb226561ac79427893ec0afd66f91a8"
+# THIRD_PARTY_SKCMS="64374756e03700d649f897dbd98c95e78c30c7da"
+# THIRD_PARTY_SJPEG="868ab558fad70fcbe8863ba4e85179eeb81cc840"
+# THIRD_PARTY_ZLIB="cacf7f1d4e3d44d871b605da3b647f07d718623f"
+#diff --git a/lib/jxl/quant_weights.cc b/lib/jxl/quant_weights.cc
+#index 2acd639b0..e8d9a10ed 100644
+#--- a/lib/jxl/quant_weights.cc
+#+++ b/lib/jxl/quant_weights.cc
+#@@ -318,8 +318,8 @@ Status ComputeQuantTable(const QuantEncoding& encoding,
+#   HWY_CAPPED(float, 64) d;
+#   for (size_t i = 0; i < num * 3; i += Lanes(d)) {
+#     auto inv_val = LoadU(d, weights.data() + i);
+#-    if (JXL_UNLIKELY(!AllFalse(inv_val >= Set(d, 1.0f / kAlmostZero)) |
+#-                     !AllFalse(inv_val < Set(d, kAlmostZero)))) {
+#+    if (JXL_UNLIKELY(!AllFalse(d, inv_val >= Set(d, 1.0f / kAlmostZero)) ||
+#+                     !AllFalse(d, inv_val < Set(d, kAlmostZero)))) {
+#       return JXL_FAILURE("Invalid quantization table");
+#     }
+#     auto val = Set(d, 1.0f) / inv_val;
+#diff --git a/third_party/CMakeLists.txt b/third_party/CMakeLists.txt
+#index 82d55d47a..afefbaa80 100644
+#--- a/third_party/CMakeLists.txt
+#+++ b/third_party/CMakeLists.txt
+#@@ -82,6 +82,7 @@ endif()  # BUILD_TESTING
+# 
+# # Highway
+# set(HWY_SYSTEM_GTEST ON CACHE INTERNAL "")
+#+set(HWY_FORCE_STATIC_LIBS ON CACHE INTERNAL "")
+# if((SANITIZER STREQUAL "asan") OR (SANITIZER STREQUAL "msan"))
+#   set(HWY_EXAMPLES_TESTS_INSTALL OFF CACHE INTERNAL "")
+# endif()
+#diff --git a/third_party/highway b/third_party/highway
+#index e69083a12..f13e3b956 160000
+#--- a/third_party/highway
+#+++ b/third_party/highway
+#@@ -1 +1 @@
+#-Subproject commit e69083a12a05caf037cabecdf1b248b7579705a5
+#+Subproject commit f13e3b956eb226561ac79427893ec0afd66f91a8
+commit 600b591538827247f1b2ad6ee6ae627a2173b7ec
+Author: Jan Wassenberg <janwas@google.com>
+Date:   Fri Feb 4 11:37:43 2022 +0100
+
+    Rename deprecated StoreFence to FlushStream
+
+diff --git a/lib/profiler/profiler.cc b/lib/profiler/profiler.cc
+index 63d8569..c72656e 100644
+--- a/lib/profiler/profiler.cc
++++ b/lib/profiler/profiler.cc
+@@ -138,7 +138,7 @@ class Results {
+   void AnalyzePackets(const Packet* HWY_RESTRICT packets,
+                       const size_t num_packets) {
+     // Ensures prior weakly-ordered streaming stores are globally visible.
+-    hwy::StoreFence();
++    hwy::FlushStream();
+ 
+     const uint64_t t0 = TicksBefore();
+ 
+@@ -448,12 +448,12 @@ void ThreadSpecific::ComputeOverhead() {
+       const size_t kReps = 10000;
+       // Analysis time should not be included => must fit within buffer.
+       HWY_ASSERT(kReps * 2 < max_packets_);
+-      hwy::StoreFence();
++      hwy::FlushStream();
+       const uint64_t t0 = TicksBefore();
+       for (size_t i = 0; i < kReps; ++i) {
+         PROFILER_ZONE("Dummy");
+       }
+-      hwy::StoreFence();
++      hwy::FlushStream();
+       const uint64_t t1 = TicksAfter();
+       HWY_ASSERT(num_packets_ + buffer_size_ == kReps * 2);
+       buffer_size_ = 0;
+#diff --git a/lib/profiler/tsc_timer.h b/lib/profiler/tsc_timer.h
+#index d3c1bee..802e40d 100644
+#--- a/lib/profiler/tsc_timer.h
+#+++ b/lib/profiler/tsc_timer.h
+#@@ -22,7 +22,6 @@
+# #include <windows.h>
+# // Undef macros to avoid collisions
+# #undef LoadFence
+#-#undef StoreFence
+# #endif
+# 
+# #if defined(__MACH__)

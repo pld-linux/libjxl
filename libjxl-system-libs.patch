@@ -1,5 +1,5 @@
---- libjxl-0.5/third_party/CMakeLists.txt.orig	2021-08-02 18:20:01.000000000 +0200
-+++ libjxl-0.5/third_party/CMakeLists.txt	2021-10-03 20:02:33.247456659 +0200
+--- libjxl-0.6.1/third_party/CMakeLists.txt.orig	2021-10-29 20:48:36.000000000 +0200
++++ libjxl-0.6.1/third_party/CMakeLists.txt	2022-04-09 22:33:00.068024829 +0200
 @@ -113,15 +113,6 @@ else()
    endif()  # JPEGXL_DEP_LICENSE_DIR
  endif()
@@ -21,7 +21,7 @@
  endif()
  
 -# *cms
--if (JPEGXL_ENABLE_SKCMS)
+-if (JPEGXL_ENABLE_SKCMS OR JPEGXL_ENABLE_PLUGINS)
 -  if( NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/skcms/skcms.h" )
 -    message(FATAL_ERROR "Please run ${PROJECT_SOURCE_DIR}/deps.sh to fetch the "
 -            "build dependencies.")
@@ -50,9 +50,9 @@
 -                 ${PROJECT_BINARY_DIR}/LICENSE.sjpeg COPYONLY)
 -endif ()
 -
---- libjxl-0.5/lib/jxl.cmake.orig	2021-08-02 18:20:01.000000000 +0200
-+++ libjxl-0.5/lib/jxl.cmake	2021-10-03 20:50:42.295138680 +0200
-@@ -381,23 +381,6 @@ if (JPEGXL_ENABLE_PROFILER)
+--- libjxl-0.6.1/lib/jxl.cmake.orig	2022-04-09 22:33:20.914578560 +0200
++++ libjxl-0.6.1/lib/jxl.cmake	2022-04-09 22:38:53.016112745 +0200
+@@ -387,17 +387,6 @@ if (JPEGXL_ENABLE_PROFILER)
  target_link_libraries(jxl_enc-obj PUBLIC jxl_profiler)
  endif()
  
@@ -61,18 +61,33 @@
 -  target_include_directories(jxl_enc-obj PRIVATE
 -    $<TARGET_PROPERTY:skcms,INCLUDE_DIRECTORIES>
 -  )
--  target_include_directories(jxl_dec-obj PRIVATE
--    $<TARGET_PROPERTY:skcms,INCLUDE_DIRECTORIES>
--  )
 -else ()
 -  target_include_directories(jxl_enc-obj PRIVATE
--    $<TARGET_PROPERTY:lcms2,INCLUDE_DIRECTORIES>
--  )
--  target_include_directories(jxl_dec-obj PRIVATE
 -    $<TARGET_PROPERTY:lcms2,INCLUDE_DIRECTORIES>
 -  )
 -endif ()
 -
  # Headers for exporting/importing public headers
  include(GenerateExportHeader)
- # TODO(deymo): Add these visibility properties to the static dependencies of
+ set_target_properties(jxl_dec-obj PROPERTIES
+@@ -436,9 +425,6 @@ set(JPEGXL_INTERNAL_OBJECTS
+   $<TARGET_OBJECTS:jxl_enc-obj>
+   $<TARGET_OBJECTS:jxl_dec-obj>
+ )
+-if (JPEGXL_ENABLE_SKCMS AND JPEGXL_BUNDLE_SKCMS)
+-  list(APPEND JPEGXL_INTERNAL_OBJECTS $<TARGET_OBJECTS:skcms-obj>)
+-endif()
+ 
+ # Private static library. This exposes all the internal functions and is used
+ # for tests.
+--- libjxl-0.6.1/plugins/gdk-pixbuf/CMakeLists.txt.orig	2021-10-29 20:48:36.000000000 +0200
++++ libjxl-0.6.1/plugins/gdk-pixbuf/CMakeLists.txt	2022-04-10 18:01:27.734885664 +0200
+@@ -23,7 +23,7 @@ set_target_properties(pixbufloader-jxl P
+ 
+ # Note: This only needs the decoder library, but we don't install the decoder
+ # shared library.
+-target_link_libraries(pixbufloader-jxl jxl jxl_threads skcms-interface PkgConfig::Gdk-Pixbuf)
++target_link_libraries(pixbufloader-jxl jxl jxl_threads skcms PkgConfig::Gdk-Pixbuf)
+ 
+ pkg_get_variable(GDK_PIXBUF_MODULEDIR gdk-pixbuf-2.0 gdk_pixbuf_moduledir)
+ install(TARGETS pixbufloader-jxl LIBRARY DESTINATION "${GDK_PIXBUF_MODULEDIR}")
