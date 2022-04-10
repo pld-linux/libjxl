@@ -2,7 +2,7 @@ Summary:	JPEG XL reference implementation
 Summary(pl.UTF-8):	Referencyjna implementacja JPEG XL
 Name:		libjxl
 Version:	0.5
-Release:	5
+Release:	6
 License:	BSD
 Group:		Libraries
 #Source0Download: https://github.com/libjxl/libjxl/releases
@@ -18,6 +18,7 @@ BuildRequires:	gdk-pixbuf2-devel >= 2.38
 BuildRequires:	giflib-devel >= 5
 BuildRequires:	gimp-devel >= 1:2.10
 BuildRequires:	gmock-devel
+BuildRequires:	google-benchmark-devel
 BuildRequires:	gtest-devel
 BuildRequires:	highway-devel
 BuildRequires:	lcms2-devel >= 2
