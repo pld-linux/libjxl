@@ -2,7 +2,7 @@ Summary:	JPEG XL reference implementation
 Summary(pl.UTF-8):	Referencyjna implementacja JPEG XL
 Name:		libjxl
 Version:	0.6.1
-Release:	1
+Release:	2
 License:	BSD
 Group:		Libraries
 #Source0Download: https://github.com/libjxl/libjxl/releases
@@ -10,6 +10,7 @@ Source0:	https://github.com/libjxl/libjxl/archive/v%{version}/%{name}-%{version}
 # Source0-md5:	5dae0f40ad6180c1b168bbf7edaf8e7d
 Patch0:		%{name}-system-libs.patch
 Patch1:		%{name}-hwy.patch
+Patch2:		%{name}-pc.patch
 URL:		https://github.com/libjxl/libjxl
 BuildRequires:	OpenEXR-devel
 BuildRequires:	asciidoc
@@ -122,6 +123,7 @@ Wtyczka wczytująca/zapisująca pliki JPEG XL dla GIMP-a.
 %setup -q
 %patch0 -p1
 %patch1 -p1
+%patch2 -p1
 
 %build
 install -d build

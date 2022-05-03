@@ -1,0 +1,24 @@
+--- libjxl-0.6.1/lib/jxl/libjxl.pc.in.orig	2021-10-29 20:48:36.000000000 +0200
++++ libjxl-0.6.1/lib/jxl/libjxl.pc.in	2022-05-03 21:03:58.423414779 +0200
+@@ -1,7 +1,7 @@
+ prefix=@CMAKE_INSTALL_PREFIX@
+ exec_prefix=${prefix}
+-libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+-includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
++libdir=@CMAKE_INSTALL_FULL_LIBDIR@
++includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+ 
+ Name: libjxl
+ Description: Loads and saves JPEG XL files
+--- libjxl-0.6.1/lib/threads/libjxl_threads.pc.in.orig	2021-10-29 20:48:36.000000000 +0200
++++ libjxl-0.6.1/lib/threads/libjxl_threads.pc.in	2022-05-03 21:03:22.520275949 +0200
+@@ -1,7 +1,7 @@
+ prefix=@CMAKE_INSTALL_PREFIX@
+ exec_prefix=${prefix}
+-libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+-includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
++libdir=@CMAKE_INSTALL_FULL_LIBDIR@
++includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+ 
+ Name: libjxl_threads
+ Description: JPEG XL multi-thread runner using std::threads.
