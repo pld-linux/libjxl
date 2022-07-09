@@ -1,3 +1,7 @@
+#
+# Conditional build:
+%bcond_with	tests		# build tests
+
 Summary:	JPEG XL reference implementation
 Summary(pl.UTF-8):	Referencyjna implementacja JPEG XL
 Name:		libjxl
@@ -19,9 +23,11 @@ BuildRequires:	doxygen
 BuildRequires:	gdk-pixbuf2-devel >= 2.38
 BuildRequires:	giflib-devel >= 5
 BuildRequires:	gimp-devel >= 1:2.10
+%if %{with tests}
 BuildRequires:	gmock-devel
 BuildRequires:	google-benchmark-devel
 BuildRequires:	gtest-devel
+%endif
 BuildRequires:	highway-devel >= 0.15.0
 BuildRequires:	lcms2-devel >= 2.10
 BuildRequires:	libavif-devel
@@ -33,7 +39,7 @@ BuildRequires:	libstdc++-devel >= 6:7
 BuildRequires:	lodepng-devel
 BuildRequires:	pkgconfig
 BuildRequires:	python3-devel >= 1:3
-BuildRequires:	rpmbuild(macros) >= 1.605
+BuildRequires:	rpmbuild(macros) >= 1.742
 # for gdk-pixbuf loader only (the rest uses lcms2 by default)
 BuildRequires:	skcms-devel
 BuildRequires:	zlib-devel
@@ -129,7 +135,7 @@ Wtyczka wczytująca/zapisująca pliki JPEG XL dla GIMP-a.
 install -d build
 cd build
 %cmake .. \
-	-DBUILD_TESTING=OFF \
+	%{cmake_on_off tests BUILD_TESTING} \
 	-DJPEGXL_ENABLE_PLUGINS=ON \
 	-DJPEGXL_ENABLE_SJPEG=OFF \
 	-DJPEGXL_ENABLE_SKCMS=OFF \
