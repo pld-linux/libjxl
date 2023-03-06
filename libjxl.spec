@@ -1,20 +1,19 @@
 #
 # Conditional build:
-%bcond_with	tests		# build tests
+%bcond_with	tests	# build tests
+%bcond_without	java	# JNI interface
 
 Summary:	JPEG XL reference implementation
 Summary(pl.UTF-8):	Referencyjna implementacja JPEG XL
 Name:		libjxl
-Version:	0.6.1
-Release:	2
+Version:	0.8.1
+Release:	1
 License:	BSD
 Group:		Libraries
 #Source0Download: https://github.com/libjxl/libjxl/releases
 Source0:	https://github.com/libjxl/libjxl/archive/v%{version}/%{name}-%{version}.tar.gz
-# Source0-md5:	5dae0f40ad6180c1b168bbf7edaf8e7d
+# Source0-md5:	04a73be60211224e039d791a902a46de
 Patch0:		%{name}-system-libs.patch
-Patch1:		%{name}-hwy.patch
-Patch2:		%{name}-pc.patch
 URL:		https://github.com/libjxl/libjxl
 BuildRequires:	OpenEXR-devel
 BuildRequires:	asciidoc
@@ -29,6 +28,7 @@ BuildRequires:	google-benchmark-devel
 BuildRequires:	gtest-devel
 %endif
 BuildRequires:	highway-devel >= 0.15.0
+%{?with_java:BuildRequires:	jdk}
 BuildRequires:	lcms2-devel >= 2.10
 BuildRequires:	libavif-devel
 BuildRequires:	libbrotli-devel
@@ -98,6 +98,18 @@ Static JXL libraries.
 %description static -l pl.UTF-8
 Statyczne biblioteki JXL.
 
+%package -n java-libjxl
+Summary:	JNI interface for JXL library
+Summary(pl.UTF-8):	Interfejs JNI do biblioteki JXL
+Group:		Libraries/Java
+Requires:	%{name} = %{version}-%{release}
+
+%description -n java-libjxl
+JNI interface for JXL library.
+
+%description -n java-libjxl -l pl.UTF-8
+Interfejs JNI do biblioteki JXL.
+
 %package -n gdk-pixbuf2-loader-jxl
 Summary:	JPEG XL loader module for gdk-pixbuf2 library
 Summary(pl.UTF-8):	Moduł biblioteki gdk-pixbuf2 wczytujący pliki JPEG XL
@@ -128,21 +140,21 @@ Wtyczka wczytująca/zapisująca pliki JPEG XL dla GIMP-a.
 %prep
 %setup -q
 %patch0 -p1
-%patch1 -p1
-%patch2 -p1
 
 %build
 install -d build
 cd build
 %cmake .. \
 	%{cmake_on_off tests BUILD_TESTING} \
+	%{!?with_java:-DJPEGXL_ENABLE_JNI=OFF} \
 	-DJPEGXL_ENABLE_PLUGINS=ON \
 	-DJPEGXL_ENABLE_SJPEG=OFF \
 	-DJPEGXL_ENABLE_SKCMS=OFF \
 	-DJPEGXL_ENABLE_TCMALLOC=OFF \
 	-DJPEGXL_FORCE_SYSTEM_BROTLI=ON \
 	-DJPEGXL_FORCE_SYSTEM_GTEST=ON \
-	-DJPEGXL_FORCE_SYSTEM_HWY=ON
+	-DJPEGXL_FORCE_SYSTEM_HWY=ON \
+	-DJPEGXL_INSTALL_JARDIR=%{_javadir}
 
 %{__make}
 
@@ -175,15 +187,17 @@ fi
 %defattr(644,root,root,755)
 %doc AUTHORS CHANGELOG.md CONTRIBUTORS LICENSE PATENTS README.md SECURITY.md doc/xl_overview.md
 %attr(755,root,root) %{_libdir}/libjxl.so.*.*.*
-%attr(755,root,root) %ghost %{_libdir}/libjxl.so.0.6
+%attr(755,root,root) %ghost %{_libdir}/libjxl.so.0.8
 %attr(755,root,root) %{_libdir}/libjxl_threads.so.*.*.*
-%attr(755,root,root) %ghost %{_libdir}/libjxl_threads.so.0.6
+%attr(755,root,root) %ghost %{_libdir}/libjxl_threads.so.0.8
 
 %files tools
 %defattr(644,root,root,755)
 %attr(755,root,root) %{_bindir}/benchmark_xl
 %attr(755,root,root) %{_bindir}/cjxl
+%attr(755,root,root) %{_bindir}/cjpeg_hdr
 %attr(755,root,root) %{_bindir}/djxl
+%attr(755,root,root) %{_bindir}/jxlinfo
 %{_mandir}/man1/cjxl.1*
 %{_mandir}/man1/djxl.1*
 
@@ -200,6 +214,13 @@ fi
 %defattr(644,root,root,755)
 %{_libdir}/libjxl.a
 %{_libdir}/libjxl_threads.a
+
+%if %{with java}
+%files -n java-libjxl
+%defattr(644,root,root,755)
+%attr(755,root,root) %{_libdir}/libjxl_jni.so
+%{_javadir}/org.jpeg.jpegxl.jar
+%endif
 
 %files -n gdk-pixbuf2-loader-jxl
 %defattr(644,root,root,755)

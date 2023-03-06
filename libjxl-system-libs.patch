@@ -1,26 +1,9 @@
---- libjxl-0.6.1/third_party/CMakeLists.txt.orig	2021-10-29 20:48:36.000000000 +0200
-+++ libjxl-0.6.1/third_party/CMakeLists.txt	2022-04-09 22:33:00.068024829 +0200
-@@ -113,15 +113,6 @@ else()
-   endif()  # JPEGXL_DEP_LICENSE_DIR
+--- libjxl-0.8.1/third_party/CMakeLists.txt.orig	2023-03-05 22:20:51.206401583 +0100
++++ libjxl-0.8.1/third_party/CMakeLists.txt	2023-03-06 19:40:16.610527695 +0100
+@@ -100,15 +100,6 @@
  endif()
  
--# lodepng
--if( NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lodepng/lodepng.h" )
--  message(FATAL_ERROR "Please run ${PROJECT_SOURCE_DIR}/deps.sh to fetch the "
--          "build dependencies.")
--endif()
--include(lodepng.cmake)
--configure_file("${CMAKE_CURRENT_SOURCE_DIR}/lodepng/LICENSE"
--               ${PROJECT_BINARY_DIR}/LICENSE.lodepng COPYONLY)
--
- # brotli
- if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/brotli/c/include/brotli/decode.h" OR
-     JPEGXL_FORCE_SYSTEM_BROTLI)
-@@ -191,33 +182,3 @@ else()
-   endif()  # BROTLI_EMSCRIPTEN
- endif()
- 
--# *cms
+ # *cms
 -if (JPEGXL_ENABLE_SKCMS OR JPEGXL_ENABLE_PLUGINS)
 -  if( NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/skcms/skcms.h" )
 -    message(FATAL_ERROR "Please run ${PROJECT_SOURCE_DIR}/deps.sh to fetch the "
@@ -30,14 +13,13 @@
 -  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/skcms/LICENSE"
 -                 ${PROJECT_BINARY_DIR}/LICENSE.skcms COPYONLY)
 -endif ()
--if (JPEGXL_ENABLE_VIEWERS OR NOT JPEGXL_ENABLE_SKCMS)
--  if( NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lcms/.git" )
--    message(SEND_ERROR "Please run git submodule update --init")
--  endif()
--  include(lcms2.cmake)
--  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/lcms/COPYING"
--                 ${PROJECT_BINARY_DIR}/LICENSE.lcms COPYONLY)
--endif()
+ if (JPEGXL_ENABLE_VIEWERS OR NOT JPEGXL_ENABLE_SKCMS)
+   if( NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lcms/.git" OR JPEGXL_FORCE_SYSTEM_LCMS2 )
+     find_package(LCMS2 2.13)
+@@ -167,14 +158,3 @@
+                    ${PROJECT_BINARY_DIR}/LICENSE.libpng COPYONLY)
+   endif()  # JPEGXL_DEP_LICENSE_DIR
+ endif()
 -
 -# sjpeg
 -if (JPEGXL_ENABLE_SJPEG)
@@ -49,10 +31,9 @@
 -  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/sjpeg/COPYING"
 -                 ${PROJECT_BINARY_DIR}/LICENSE.sjpeg COPYONLY)
 -endif ()
--
---- libjxl-0.6.1/lib/jxl.cmake.orig	2022-04-09 22:33:20.914578560 +0200
-+++ libjxl-0.6.1/lib/jxl.cmake	2022-04-09 22:38:53.016112745 +0200
-@@ -387,17 +387,6 @@ if (JPEGXL_ENABLE_PROFILER)
+--- libjxl-0.8.1/lib/jxl.cmake.orig	2023-02-03 13:15:36.000000000 +0100
++++ libjxl-0.8.1/lib/jxl.cmake	2023-03-06 19:41:57.656646948 +0100
+@@ -453,17 +453,6 @@
  target_link_libraries(jxl_enc-obj PUBLIC jxl_profiler)
  endif()
  
@@ -67,10 +48,10 @@
 -  )
 -endif ()
 -
- # Headers for exporting/importing public headers
- include(GenerateExportHeader)
- set_target_properties(jxl_dec-obj PROPERTIES
-@@ -436,9 +425,6 @@ set(JPEGXL_INTERNAL_OBJECTS
+ # Generate version.h
+ configure_file("jxl/version.h.in" "include/jxl/version.h")
+ 
+@@ -505,9 +494,6 @@
    $<TARGET_OBJECTS:jxl_enc-obj>
    $<TARGET_OBJECTS:jxl_dec-obj>
  )
@@ -80,14 +61,14 @@
  
  # Private static library. This exposes all the internal functions and is used
  # for tests.
---- libjxl-0.6.1/plugins/gdk-pixbuf/CMakeLists.txt.orig	2021-10-29 20:48:36.000000000 +0200
-+++ libjxl-0.6.1/plugins/gdk-pixbuf/CMakeLists.txt	2022-04-10 18:01:27.734885664 +0200
-@@ -23,7 +23,7 @@ set_target_properties(pixbufloader-jxl P
+--- libjxl-0.8.1/plugins/gdk-pixbuf/CMakeLists.txt.orig	2023-03-06 19:40:46.967029907 +0100
++++ libjxl-0.8.1/plugins/gdk-pixbuf/CMakeLists.txt	2023-03-06 19:42:39.186421962 +0100
+@@ -23,7 +23,7 @@
  
  # Note: This only needs the decoder library, but we don't install the decoder
  # shared library.
 -target_link_libraries(pixbufloader-jxl jxl jxl_threads skcms-interface PkgConfig::Gdk-Pixbuf)
 +target_link_libraries(pixbufloader-jxl jxl jxl_threads skcms PkgConfig::Gdk-Pixbuf)
  
- pkg_get_variable(GDK_PIXBUF_MODULEDIR gdk-pixbuf-2.0 gdk_pixbuf_moduledir)
- install(TARGETS pixbufloader-jxl LIBRARY DESTINATION "${GDK_PIXBUF_MODULEDIR}")
+ execute_process(COMMAND ${PKG_CONFIG_EXECUTABLE} gdk-pixbuf-2.0 --variable gdk_pixbuf_moduledir --define-variable=prefix=${CMAKE_INSTALL_PREFIX} OUTPUT_VARIABLE GDK_PIXBUF_MODULEDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+ install(TARGETS pixbufloader-jxl DESTINATION "${GDK_PIXBUF_MODULEDIR}")
