@@ -31,6 +31,7 @@ BuildRequires:	gtest-devel
 %endif
 BuildRequires:	highway-devel >= 0.15.0
 %{?with_java:%buildrequires_jdk}
+%{?with_java:%{?use_jdk:BuildRequires:  %{use_jdk}-jre-base-X11}}
 BuildRequires:	lcms2-devel >= 2.10
 BuildRequires:	libavif-devel
 BuildRequires:	libbrotli-devel
