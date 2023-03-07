@@ -3,6 +3,8 @@
 %bcond_with	tests	# build tests
 %bcond_without	java	# JNI interface
 
+%{?use_default_jdk}
+
 Summary:	JPEG XL reference implementation
 Summary(pl.UTF-8):	Referencyjna implementacja JPEG XL
 Name:		libjxl
@@ -28,7 +30,7 @@ BuildRequires:	google-benchmark-devel
 BuildRequires:	gtest-devel
 %endif
 BuildRequires:	highway-devel >= 0.15.0
-%{?with_java:BuildRequires:	jdk}
+%{?with_java:%buildrequires_jdk}
 BuildRequires:	lcms2-devel >= 2.10
 BuildRequires:	libavif-devel
 BuildRequires:	libbrotli-devel
@@ -142,6 +144,7 @@ Wtyczka wczytująca/zapisująca pliki JPEG XL dla GIMP-a.
 %patch0 -p1
 
 %build
+export JAVA_HOME="%{java_home}"
 install -d build
 cd build
 %cmake .. \
