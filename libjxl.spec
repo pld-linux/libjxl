@@ -8,13 +8,13 @@
 Summary:	JPEG XL reference implementation
 Summary(pl.UTF-8):	Referencyjna implementacja JPEG XL
 Name:		libjxl
-Version:	0.8.1
+Version:	0.8.2
 Release:	1
 License:	BSD
 Group:		Libraries
 #Source0Download: https://github.com/libjxl/libjxl/releases
 Source0:	https://github.com/libjxl/libjxl/archive/v%{version}/%{name}-%{version}.tar.gz
-# Source0-md5:	04a73be60211224e039d791a902a46de
+# Source0-md5:	826a2508b7978f50638794473173a3ad
 Patch0:		%{name}-system-libs.patch
 URL:		https://github.com/libjxl/libjxl
 BuildRequires:	OpenEXR-devel
