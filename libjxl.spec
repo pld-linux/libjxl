@@ -42,7 +42,7 @@ BuildRequires:	libstdc++-devel >= 6:7
 BuildRequires:	lodepng-devel
 BuildRequires:	pkgconfig
 BuildRequires:	python3-devel >= 1:3
-BuildRequires:	rpmbuild(macros) >= 1.742
+BuildRequires:	rpmbuild(macros) >= 2.021
 # for gdk-pixbuf loader only (the rest uses lcms2 by default)
 BuildRequires:	skcms-devel
 BuildRequires:	zlib-devel
