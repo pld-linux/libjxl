@@ -1,25 +1,26 @@
 #
 # Conditional build:
-%bcond_with	tests	# build tests
-%bcond_without	java	# JNI interface
+%bcond_without	static_libs	# static library
+%bcond_with	tests		# build tests
+%bcond_without	java		# JNI interface
 
 %{?use_default_jdk}
 
 Summary:	JPEG XL reference implementation
 Summary(pl.UTF-8):	Referencyjna implementacja JPEG XL
 Name:		libjxl
-Version:	0.8.2
+Version:	0.10.2
 Release:	1
 License:	BSD
 Group:		Libraries
 #Source0Download: https://github.com/libjxl/libjxl/releases
 Source0:	https://github.com/libjxl/libjxl/archive/v%{version}/%{name}-%{version}.tar.gz
-# Source0-md5:	826a2508b7978f50638794473173a3ad
+# Source0-md5:	e383b622cb2caef4dfcc8047f5a0fe72
 Patch0:		%{name}-system-libs.patch
 URL:		https://github.com/libjxl/libjxl
 BuildRequires:	OpenEXR-devel
 BuildRequires:	asciidoc
-BuildRequires:	cmake >= 3.10
+BuildRequires:	cmake >= 3.16
 BuildRequires:	doxygen
 BuildRequires:	gdk-pixbuf2-devel >= 2.38
 BuildRequires:	giflib-devel >= 5
@@ -43,8 +44,6 @@ BuildRequires:	lodepng-devel
 BuildRequires:	pkgconfig
 BuildRequires:	python3-devel >= 1:3
 BuildRequires:	rpmbuild(macros) >= 2.021
-# for gdk-pixbuf loader only (the rest uses lcms2 by default)
-BuildRequires:	skcms-devel
 BuildRequires:	zlib-devel
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
@@ -146,9 +145,31 @@ Wtyczka wczytująca/zapisująca pliki JPEG XL dla GIMP-a.
 
 %build
 export JAVA_HOME="%{java_home}"
-install -d build
-cd build
-%cmake .. \
+
+%if %{with static_libs}
+%cmake -B build-static \
+	-DBUILD_SHARED_LIBS=OFF \
+	%{cmake_on_off tests BUILD_TESTING} \
+	-DJPEGXL_ENABLE_BENCHMARK=OFF \
+	-DJPEGXL_ENABLE_DOXYGEN=OFF \
+	-DJPEGXL_ENABLE_EXAMPLES=OFF \
+	-DJPEGXL_ENABLE_JNI=OFF \
+	-DJPEGXL_ENABLE_MANPAGES=OFF \
+	-DJPEGXL_ENABLE_SJPEG=OFF \
+	-DJPEGXL_ENABLE_SKCMS=OFF \
+	-DJPEGXL_ENABLE_TCMALLOC=OFF \
+	-DJPEGXL_ENABLE_TOOLS=OFF \
+	-DJPEGXL_ENABLE_VIEWERS=OFF \
+	-DJPEGXL_FORCE_SYSTEM_BROTLI=ON \
+	-DJPEGXL_FORCE_SYSTEM_GTEST=ON \
+	-DJPEGXL_FORCE_SYSTEM_HWY=ON \
+	-DJPEGXL_FORCE_SYSTEM_LCMS2=ON \
+	-DJPEGXL_INSTALL_JARDIR=%{_javadir}
+
+%{__make} -C build-static
+%endif
+
+%cmake -B build \
 	%{cmake_on_off tests BUILD_TESTING} \
 	%{!?with_java:-DJPEGXL_ENABLE_JNI=OFF} \
 	-DJPEGXL_ENABLE_PLUGINS=ON \
@@ -158,12 +179,18 @@ cd build
 	-DJPEGXL_FORCE_SYSTEM_BROTLI=ON \
 	-DJPEGXL_FORCE_SYSTEM_GTEST=ON \
 	-DJPEGXL_FORCE_SYSTEM_HWY=ON \
+	-DJPEGXL_FORCE_SYSTEM_LCMS2=ON \
 	-DJPEGXL_INSTALL_JARDIR=%{_javadir}
 
-%{__make}
+%{__make} -C build
 
 %install
 rm -rf $RPM_BUILD_ROOT
+
+%if %{with static_libs}
+%{__make} -C build-static install \
+	DESTDIR=$RPM_BUILD_ROOT
+%endif
 
 %{__make} -C build install \
 	DESTDIR=$RPM_BUILD_ROOT
@@ -191,15 +218,18 @@ fi
 %defattr(644,root,root,755)
 %doc AUTHORS CHANGELOG.md CONTRIBUTORS LICENSE PATENTS README.md SECURITY.md doc/xl_overview.md
 %attr(755,root,root) %{_libdir}/libjxl.so.*.*.*
-%attr(755,root,root) %ghost %{_libdir}/libjxl.so.0.8
+%attr(755,root,root) %ghost %{_libdir}/libjxl.so.0.10
+%attr(755,root,root) %{_libdir}/libjxl_cms.so.*.*.*
+%attr(755,root,root) %ghost %{_libdir}/libjxl_cms.so.0.10
+%attr(755,root,root) %{_libdir}/libjxl_extras_codec.so.*.*.*
+%attr(755,root,root) %ghost %{_libdir}/libjxl_extras_codec.so.0.10
 %attr(755,root,root) %{_libdir}/libjxl_threads.so.*.*.*
-%attr(755,root,root) %ghost %{_libdir}/libjxl_threads.so.0.8
+%attr(755,root,root) %ghost %{_libdir}/libjxl_threads.so.0.10
 
 %files tools
 %defattr(644,root,root,755)
 %attr(755,root,root) %{_bindir}/benchmark_xl
 %attr(755,root,root) %{_bindir}/cjxl
-%attr(755,root,root) %{_bindir}/cjpeg_hdr
 %attr(755,root,root) %{_bindir}/djxl
 %attr(755,root,root) %{_bindir}/jxlinfo
 %{_mandir}/man1/cjxl.1*
@@ -208,16 +238,21 @@ fi
 %files devel
 %defattr(644,root,root,755)
 %attr(755,root,root) %{_libdir}/libjxl.so
+%attr(755,root,root) %{_libdir}/libjxl_cms.so
+%attr(755,root,root) %{_libdir}/libjxl_extras_codec.so
 %attr(755,root,root) %{_libdir}/libjxl_threads.so
-%{_libdir}/libjxl_dec.a
 %{_includedir}/jxl
 %{_pkgconfigdir}/libjxl.pc
+%{_pkgconfigdir}/libjxl_cms.pc
 %{_pkgconfigdir}/libjxl_threads.pc
 
+%if %{with static_libs}
 %files static
 %defattr(644,root,root,755)
 %{_libdir}/libjxl.a
+%{_libdir}/libjxl_cms.a
 %{_libdir}/libjxl_threads.a
+%endif
 
 %if %{with java}
 %files -n java-libjxl
