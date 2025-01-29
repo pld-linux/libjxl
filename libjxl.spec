@@ -3,19 +3,20 @@
 %bcond_without	static_libs	# static library
 %bcond_with	tests		# build tests
 %bcond_without	java		# JNI interface
+%bcond_with	gimp		# build gimp plugin
 
 %{?use_default_jdk}
 
 Summary:	JPEG XL reference implementation
 Summary(pl.UTF-8):	Referencyjna implementacja JPEG XL
 Name:		libjxl
-Version:	0.10.2
+Version:	0.11.1
 Release:	1
 License:	BSD
 Group:		Libraries
 #Source0Download: https://github.com/libjxl/libjxl/releases
 Source0:	https://github.com/libjxl/libjxl/archive/v%{version}/%{name}-%{version}.tar.gz
-# Source0-md5:	e383b622cb2caef4dfcc8047f5a0fe72
+# Source0-md5:	8f26fc954c2d9cb377544a5f029182ef
 Patch0:		%{name}-system-libs.patch
 URL:		https://github.com/libjxl/libjxl
 BuildRequires:	OpenEXR-devel
@@ -24,7 +25,7 @@ BuildRequires:	cmake >= 3.16
 BuildRequires:	doxygen
 BuildRequires:	gdk-pixbuf2-devel >= 2.38
 BuildRequires:	giflib-devel >= 5
-BuildRequires:	gimp-devel >= 1:2.10
+%{?with_gimp:BuildRequires:	gimp-devel >= 1:2.10}
 %if %{with tests}
 BuildRequires:	gmock-devel
 BuildRequires:	google-benchmark-devel
@@ -150,6 +151,7 @@ export JAVA_HOME="%{java_home}"
 %cmake -B build-static \
 	-DBUILD_SHARED_LIBS=OFF \
 	%{cmake_on_off tests BUILD_TESTING} \
+	%{cmake_on_off gimp JPEGXL_ENABLE_PLUGIN_GIMP210} \
 	-DJPEGXL_ENABLE_BENCHMARK=OFF \
 	-DJPEGXL_ENABLE_DOXYGEN=OFF \
 	-DJPEGXL_ENABLE_EXAMPLES=OFF \
@@ -172,6 +174,7 @@ export JAVA_HOME="%{java_home}"
 %cmake -B build \
 	%{cmake_on_off tests BUILD_TESTING} \
 	%{!?with_java:-DJPEGXL_ENABLE_JNI=OFF} \
+	%{cmake_on_off gimp JPEGXL_ENABLE_PLUGIN_GIMP210} \
 	-DJPEGXL_ENABLE_PLUGINS=ON \
 	-DJPEGXL_ENABLE_SJPEG=OFF \
 	-DJPEGXL_ENABLE_SKCMS=OFF \
@@ -218,13 +221,13 @@ fi
 %defattr(644,root,root,755)
 %doc AUTHORS CHANGELOG.md CONTRIBUTORS LICENSE PATENTS README.md SECURITY.md doc/xl_overview.md
 %attr(755,root,root) %{_libdir}/libjxl.so.*.*.*
-%attr(755,root,root) %ghost %{_libdir}/libjxl.so.0.10
+%attr(755,root,root) %ghost %{_libdir}/libjxl.so.0.11
 %attr(755,root,root) %{_libdir}/libjxl_cms.so.*.*.*
-%attr(755,root,root) %ghost %{_libdir}/libjxl_cms.so.0.10
-%attr(755,root,root) %{_libdir}/libjxl_extras_codec.so.*.*.*
-%attr(755,root,root) %ghost %{_libdir}/libjxl_extras_codec.so.0.10
+%attr(755,root,root) %ghost %{_libdir}/libjxl_cms.so.0.11
+#%attr(755,root,root) %{_libdir}/libjxl_extras_codec.so.*.*.*
+#%attr(755,root,root) %ghost %{_libdir}/libjxl_extras_codec.so.0.11
 %attr(755,root,root) %{_libdir}/libjxl_threads.so.*.*.*
-%attr(755,root,root) %ghost %{_libdir}/libjxl_threads.so.0.10
+%attr(755,root,root) %ghost %{_libdir}/libjxl_threads.so.0.11
 
 %files tools
 %defattr(644,root,root,755)
@@ -239,7 +242,7 @@ fi
 %defattr(644,root,root,755)
 %attr(755,root,root) %{_libdir}/libjxl.so
 %attr(755,root,root) %{_libdir}/libjxl_cms.so
-%attr(755,root,root) %{_libdir}/libjxl_extras_codec.so
+#%attr(755,root,root) %{_libdir}/libjxl_extras_codec.so
 %attr(755,root,root) %{_libdir}/libjxl_threads.so
 %{_includedir}/jxl
 %{_pkgconfigdir}/libjxl.pc
@@ -267,7 +270,9 @@ fi
 %{_datadir}/mime/packages/image-jxl.xml
 %{_datadir}/thumbnailers/jxl.thumbnailer
 
+%if %{with gimp}
 %files -n gimp-plugin-jxl
 %defattr(644,root,root,755)
 %dir %{_libdir}/gimp/2.0/plug-ins/file-jxl
 %attr(755,root,root) %{_libdir}/gimp/2.0/plug-ins/file-jxl/file-jxl
+%endif
