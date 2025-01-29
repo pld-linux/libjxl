@@ -142,7 +142,7 @@ Wtyczka wczytująca/zapisująca pliki JPEG XL dla GIMP-a.
 
 %prep
 %setup -q
-%patch0 -p1
+%patch -P0 -p1
 
 %build
 export JAVA_HOME="%{java_home}"
