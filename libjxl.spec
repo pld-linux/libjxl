@@ -224,8 +224,6 @@ fi
 %attr(755,root,root) %ghost %{_libdir}/libjxl.so.0.11
 %attr(755,root,root) %{_libdir}/libjxl_cms.so.*.*.*
 %attr(755,root,root) %ghost %{_libdir}/libjxl_cms.so.0.11
-#%attr(755,root,root) %{_libdir}/libjxl_extras_codec.so.*.*.*
-#%attr(755,root,root) %ghost %{_libdir}/libjxl_extras_codec.so.0.11
 %attr(755,root,root) %{_libdir}/libjxl_threads.so.*.*.*
 %attr(755,root,root) %ghost %{_libdir}/libjxl_threads.so.0.11
 
@@ -242,8 +240,8 @@ fi
 %defattr(644,root,root,755)
 %attr(755,root,root) %{_libdir}/libjxl.so
 %attr(755,root,root) %{_libdir}/libjxl_cms.so
-#%attr(755,root,root) %{_libdir}/libjxl_extras_codec.so
 %attr(755,root,root) %{_libdir}/libjxl_threads.so
+%{_libdir}/libjxl_extras_codec.a
 %{_includedir}/jxl
 %{_pkgconfigdir}/libjxl.pc
 %{_pkgconfigdir}/libjxl_cms.pc
